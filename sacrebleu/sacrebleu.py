@@ -38,6 +38,8 @@ if __package__ is None and __name__ == '__main__':
 from .tokenizers import TOKENIZERS, DEFAULT_TOKENIZER
 from .dataset import DATASETS, DOMAINS, COUNTRIES, SUBSETS
 from .metrics import METRICS
+from .resegment import Resegment
+
 
 from .utils import smart_open, filter_subset, get_available_origlangs, SACREBLEU_DIR
 from .utils import get_langpairs_for_testset, get_available_testsets
@@ -115,6 +117,12 @@ def parse_args():
                             help='chrf BETA parameter (default: %(default)s)')
     arg_parser.add_argument('--chrf-whitespace', action='store_true', default=False,
                             help='include whitespace in chrF calculation (default: %(default)s)')
+
+    # SLT Resegmentation
+    arg_parser.add_argument('--resegment', action='store_true', default=False,
+                            help='Resegment hypotheses to fit sentence segmentation of reference (default: %(default)s)')
+    arg_parser.add_argument('--output_resegment', type=str, default="",
+                            help='Output resegmented input to file (default: %(default)s)')
 
     # Reporting related arguments
     arg_parser.add_argument('--quiet', '-q', default=False, action='store_true',
@@ -273,6 +281,22 @@ def main():
     else:
         inputfh = smart_open(args.input, encoding=args.encoding)
     full_system = inputfh.readlines()
+
+
+    if args.resegment:
+        if args.num_refs != 1:
+            sacrelogger.error('FATAL: line {}: Resegmentation currently only supported for single reference'.format(lineno))
+            sys.exit(17)
+        reseg = Resegment(args.tokenize)
+        full_system = reseg.align(full_refs[0],full_system)
+        if(args.output_resegment):
+            out_seg= smart_open(args.output_resegment, mode='w',encoding=args.encoding)
+            for l in full_system:
+                out_seg.write(l+"\n")
+            out_seg.close()
+
+
+
 
     # Filter sentences according to a given origlang
     system, *refs = filter_subset(
